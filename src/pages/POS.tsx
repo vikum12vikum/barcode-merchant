@@ -15,6 +15,7 @@ import {
   Receipt, 
   Trash, 
   Plus,
+  Minus,
   PercentIcon,
   Banknote,
   CreditCard,
@@ -118,7 +119,7 @@ export default function POS() {
     }
   };
 
-  // Add to cart
+  // Add to cart - fixing the functionality
   const addToCart = (product: Product) => {
     if (product.stock <= 0) {
       toast.error("Product is out of stock");

@@ -35,6 +35,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const { isAdmin } = useAuth();
   const [isHovered, setIsHovered] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const hasLowStock = product.stock <= product.lowStockThreshold;
 
   return (
@@ -57,12 +58,13 @@ export function ProductCard({
       )}
       
       <div className="aspect-square bg-secondary/50 flex items-center justify-center">
-        {product.image ? (
+        {product.image && !imageError ? (
           <img
             src={product.image}
             alt={product.name}
             className="object-cover w-full h-full transition-opacity duration-200"
             loading="lazy"
+            onError={() => setImageError(true)}
           />
         ) : (
           <Package className="h-12 w-12 text-muted-foreground/30" />
