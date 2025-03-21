@@ -15,6 +15,8 @@ import POS from "./pages/POS";
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
+import Loans from "./pages/Loans";
+import LoanDetails from "./pages/LoanDetails";
 import NotFound from "./pages/NotFound";
 import { Navigation } from "./components/layout/Navigation";
 
@@ -125,6 +127,24 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Sales />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/loans"
+        element={
+          <ProtectedRoute>
+            <Loans />
+          </ProtectedRoute>
+        }
+      />
+      
+      <Route
+        path="/loans/:id"
+        element={
+          <ProtectedRoute>
+            <LoanDetails />
           </ProtectedRoute>
         }
       />

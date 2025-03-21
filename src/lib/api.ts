@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { 
   Product, 
@@ -8,7 +7,10 @@ import {
   DailySalesReport,
   ProductSalesReport,
   InventoryAdjustment,
-  User
+  User,
+  Loan,
+  LoanPayment,
+  LoanSummary
 } from "./types";
 
 const API_URL = "http://95.164.54.64:25553";
@@ -192,6 +194,62 @@ export async function adjustInventory(adjustment: InventoryAdjustment): Promise<
     method: "POST",
     body: JSON.stringify(adjustment),
   });
+}
+
+// Loan Management
+export async function getLoans(): Promise<Loan[]> {
+  const data = await fetchApi<Loan[]>("/api/loans");
+  cacheResponse("/api/loans", data);
+  return data;
+}
+
+export async function getCustomerLoans(customerId: string): Promise<Loan[]> {
+  const data = await fetchApi<Loan[]>(`/api/customers/${customerId}/loans`);
+  cacheResponse(`/api/customers/${customerId}/loans`, data);
+  return data;
+}
+
+export async function getLoan(id: string): Promise<Loan> {
+  return fetchApi<Loan>(`/api/loans/${id}`);
+}
+
+export async function createLoan(loan: Omit<Loan, "id" | "createdAt" | "updatedAt" | "customer">): Promise<Loan> {
+  return fetchApi<Loan>("/api/loans", {
+    method: "POST",
+    body: JSON.stringify(loan),
+  });
+}
+
+export async function updateLoan(id: string, loan: Partial<Loan>): Promise<Loan> {
+  return fetchApi<Loan>(`/api/loans/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(loan),
+  });
+}
+
+export async function deleteLoan(id: string): Promise<void> {
+  return fetchApi<void>(`/api/loans/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getLoanPayments(loanId: string): Promise<LoanPayment[]> {
+  const data = await fetchApi<LoanPayment[]>(`/api/loans/${loanId}/payments`);
+  cacheResponse(`/api/loans/${loanId}/payments`, data);
+  return data;
+}
+
+export async function createLoanPayment(loanId: string, payment: Omit<LoanPayment, "id" | "loanId">): Promise<LoanPayment> {
+  return fetchApi<LoanPayment>(`/api/loans/${loanId}/payments`, {
+    method: "POST",
+    body: JSON.stringify(payment),
+  });
+}
+
+export async function getLoanSummary(): Promise<LoanSummary> {
+  const data = await fetchApi<LoanSummary>("/api/loans/summary");
+  cacheResponse("/api/loans/summary", data);
+  return data;
 }
 
 // Offline support - sync local data when back online

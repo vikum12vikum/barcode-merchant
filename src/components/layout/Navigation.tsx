@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   ReceiptText,
-  Wallet
+  Wallet,
+  CreditCard
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,11 @@ export function Navigation() {
       icon: <ReceiptText size={18} />,
       label: "Sales",
       to: "/sales",
+    },
+    {
+      icon: <CreditCard size={18} />,
+      label: "Loans",
+      to: "/loans",
     },
     {
       icon: <BarChart3 size={18} />,

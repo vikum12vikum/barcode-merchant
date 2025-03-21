@@ -81,3 +81,38 @@ export interface InventoryAdjustment {
   quantity: number;
   reason: string;
 }
+
+// Loan related interfaces
+export interface Loan {
+  id: string;
+  customerId: string;
+  customer: Customer;
+  amount: number;
+  remainingAmount: number;
+  status: 'active' | 'paid' | 'defaulted';
+  dueDate: string;
+  installmentFrequency: 'daily' | 'weekly' | 'monthly';
+  installmentAmount: number;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LoanPayment {
+  id: string;
+  loanId: string;
+  amount: number;
+  paymentMethod: 'cash' | 'card' | 'digital';
+  paymentDate: string;
+  notes?: string;
+}
+
+export interface LoanSummary {
+  totalLoans: number;
+  activeLoans: number;
+  paidLoans: number;
+  defaultedLoans: number;
+  totalAmountLent: number;
+  totalAmountOutstanding: number;
+  totalAmountRepaid: number;
+}
