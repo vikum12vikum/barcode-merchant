@@ -33,9 +33,9 @@ const queryClient = new QueryClient({
 setupOfflineSync();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <div className="animate-spin h-12 w-12 rounded-full border-t-2 border-b-2 border-primary"></div>
@@ -47,9 +47,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <div className="animate-spin h-12 w-12 rounded-full border-t-2 border-b-2 border-primary"></div>
@@ -74,8 +74,8 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
+      <Router>
+        <AuthProvider>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
@@ -183,9 +183,9 @@ function App() {
             />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Router>
-        <Toaster position="top-right" expand={false} richColors />
-      </AuthProvider>
+          <Toaster position="top-right" expand={false} richColors />
+        </AuthProvider>
+      </Router>
     </QueryClientProvider>
   );
 }

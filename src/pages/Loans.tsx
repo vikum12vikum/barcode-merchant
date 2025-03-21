@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getLoans, getCustomers, createLoan, updateLoan, deleteLoan, getLoanSummary } from "@/lib/api";
@@ -13,7 +12,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+  } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -236,18 +235,14 @@ export default function Loans() {
   };
 
   // Handle create loan
-  const handleCreateLoan = () => {
+  const handleCreateLoan = (data) => {
+    // When creating a new loan, ensure it has the 'type' field
     const newLoan = {
-      customerId: formData.customerId,
-      amount: formData.amount,
-      remainingAmount: formData.amount,
-      status: formData.status as 'active' | 'paid' | 'defaulted',
-      dueDate: formData.dueDate,
-      installmentFrequency: formData.installmentFrequency as 'daily' | 'weekly' | 'monthly',
-      installmentAmount: formData.installmentAmount,
-      notes: formData.notes || undefined,
+      ...data,
+      type: "cash", // Add this line to fix the error
+      remainingAmount: data.amount
     };
-
+    
     createLoanMutation.mutate(newLoan);
   };
 

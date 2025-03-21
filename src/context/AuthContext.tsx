@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User } from "@/lib/types";
 import { login as apiLogin } from "@/lib/api";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 interface AuthContextType {
@@ -18,7 +17,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const navigate = useNavigate();
 
   // Check for existing user session on mount
   useEffect(() => {
@@ -41,7 +39,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user);
       localStorage.setItem("user", JSON.stringify(user));
       toast.success(`Welcome back, ${user.name}!`);
-      navigate("/dashboard");
+      
+      // Instead of using navigate, we'll use window.location to redirect
+      window.location.href = "/dashboard";
+      return;
     } catch (error) {
       console.error("Login failed:", error);
       toast.error("Invalid username or password");
@@ -55,7 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
     localStorage.removeItem("user");
     toast.info("You have been logged out");
-    navigate("/login");
+    
+    // Use window.location instead of navigate
+    window.location.href = "/login";
   };
 
   return (
