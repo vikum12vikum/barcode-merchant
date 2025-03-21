@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { 
   Product, 
@@ -10,7 +11,10 @@ import {
   User,
   Loan,
   LoanPayment,
-  LoanSummary
+  LoanSummary,
+  CashInHand,
+  CashTransaction,
+  BorrowedItem
 } from "./types";
 
 const API_URL = "http://95.164.54.64:25553";
@@ -196,6 +200,30 @@ export async function adjustInventory(adjustment: InventoryAdjustment): Promise<
   });
 }
 
+// Cash in Hand
+export async function getCashInHand(): Promise<CashInHand> {
+  const data = await fetchApi<CashInHand>("/api/cash-in-hand");
+  cacheResponse("/api/cash-in-hand", data);
+  return data;
+}
+
+export async function updateCashInHand(amount: number, type: 'deposit' | 'withdrawal', reason: string): Promise<CashInHand> {
+  return fetchApi<CashInHand>("/api/cash-in-hand", {
+    method: "POST",
+    body: JSON.stringify({
+      amount,
+      type,
+      reason
+    }),
+  });
+}
+
+export async function getCashTransactions(): Promise<CashTransaction[]> {
+  const data = await fetchApi<CashTransaction[]>("/api/cash-transactions");
+  cacheResponse("/api/cash-transactions", data);
+  return data;
+}
+
 // Loan Management
 export async function getLoans(): Promise<Loan[]> {
   const data = await fetchApi<Loan[]>("/api/loans");
@@ -252,6 +280,20 @@ export async function getLoanSummary(): Promise<LoanSummary> {
   return data;
 }
 
+// Borrowed Items
+export async function getBorrowedItems(loanId: string): Promise<BorrowedItem[]> {
+  const data = await fetchApi<BorrowedItem[]>(`/api/loans/${loanId}/items`);
+  cacheResponse(`/api/loans/${loanId}/items`, data);
+  return data;
+}
+
+export async function updateBorrowedItem(loanId: string, itemId: string, item: Partial<BorrowedItem>): Promise<BorrowedItem> {
+  return fetchApi<BorrowedItem>(`/api/loans/${loanId}/items/${itemId}`, {
+    method: "PUT",
+    body: JSON.stringify(item),
+  });
+}
+
 // Offline support - sync local data when back online
 export function setupOfflineSync() {
   window.addEventListener("online", async () => {
@@ -269,6 +311,15 @@ export function setupOfflineSync() {
             break;
           case "ADJUST_INVENTORY":
             await adjustInventory(action.data);
+            break;
+          case "UPDATE_CASH":
+            await updateCashInHand(action.data.amount, action.data.type, action.data.reason);
+            break;
+          case "CREATE_LOAN":
+            await createLoan(action.data);
+            break;
+          case "CREATE_LOAN_PAYMENT":
+            await createLoanPayment(action.data.loanId, action.data.payment);
             break;
           // Add other sync actions as needed
         }
@@ -289,4 +340,27 @@ export function addPendingAction(type: string, data: any) {
   const pendingActions = JSON.parse(localStorage.getItem("pendingActions") || "[]");
   pendingActions.push({ type, data, timestamp: new Date().toISOString() });
   localStorage.setItem("pendingActions", JSON.stringify(pendingActions));
+}
+
+// Printing utility
+export function printReceipt(receiptContent: string): void {
+  // Create a new window for printing
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(receiptContent);
+    printWindow.document.close();
+    
+    // Wait for resources to load before printing
+    printWindow.onload = function() {
+      printWindow.print();
+      // Close the window after printing (some browsers might block this)
+      printWindow.onafterprint = function() {
+        printWindow.close();
+      };
+    };
+    
+    toast.success("Receipt sent to printer");
+  } else {
+    toast.error("Unable to open print window. Please check your popup blocker settings.");
+  }
 }

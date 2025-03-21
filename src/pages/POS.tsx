@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getProducts, getCustomers, createSale } from "@/lib/api";
+import { getProducts, getCustomers, createSale, printReceipt } from "@/lib/api";
 import { Product, Customer, Sale } from "@/lib/types";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { ProductCard } from "@/components/ProductCard";
@@ -49,6 +48,8 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
+import { useAuth } from "@/context/AuthContext";
 
 interface CartItem {
   product: Product;
@@ -56,6 +57,7 @@ interface CartItem {
 }
 
 export default function POS() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -222,15 +224,15 @@ export default function POS() {
       setTimeout(() => {
         toast.success("Sale completed successfully");
         
+        // Print receipt
+        generateAndPrintReceipt(sale);
+        
         // Clear cart and reset state
         clearCart();
         setIsPaymentDialogOpen(false);
         setPaymentMethod("cash");
         setAmountPaid("");
         setIsCheckoutLoading(false);
-        
-        // Print receipt
-        printReceipt(sale);
       }, 1000);
     } catch (error) {
       console.error("Failed to complete sale:", error);
@@ -239,11 +241,148 @@ export default function POS() {
     }
   };
 
-  // Print receipt
-  const printReceipt = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
-    // In a real app, this would print a receipt
-    console.log("Printing receipt for sale:", sale);
-    toast.info("Receipt sent to printer");
+  // Generate and print receipt
+  const generateAndPrintReceipt = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
+    // Format currency
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(amount);
+    };
+    
+    // Create receipt content
+    const receiptHTML = `
+      <html>
+        <head>
+          <title>Sales Receipt</title>
+          <style>
+            body {
+              font-family: 'Courier New', Courier, monospace;
+              margin: 0;
+              padding: 20px;
+              max-width: 300px;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            .store-name {
+              font-size: 18px;
+              font-weight: bold;
+            }
+            .info {
+              margin-bottom: 15px;
+              font-size: 12px;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 10px 0;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+            }
+            th, td {
+              text-align: left;
+              padding: 3px 0;
+            }
+            .amount {
+              text-align: right;
+            }
+            .total {
+              font-weight: bold;
+            }
+            .footer {
+              margin-top: 20px;
+              text-align: center;
+              font-size: 12px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="store-name">Merchant POS</div>
+            <div>Sales Receipt</div>
+          </div>
+          
+          <div class="info">
+            <div>Invoice #: ${sale.invoiceNumber}</div>
+            <div>Date: ${format(new Date(), 'PP')}</div>
+            <div>Time: ${format(new Date(), 'pp')}</div>
+            <div>Cashier: ${user?.name || 'Unknown'}</div>
+            ${sale.customer ? `<div>Customer: ${sale.customer.name}</div>` : ''}
+          </div>
+          
+          <div class="divider"></div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th class="amount">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sale.items.map(item => `
+                <tr>
+                  <td>${item.product.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${formatCurrency(item.price)}</td>
+                  <td class="amount">${formatCurrency(item.price * item.quantity)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="divider"></div>
+          
+          <table>
+            <tr>
+              <td>Subtotal:</td>
+              <td class="amount">${formatCurrency(sale.subtotal)}</td>
+            </tr>
+            ${sale.discount > 0 ? `
+              <tr>
+                <td>Discount (${discountPercent}%):</td>
+                <td class="amount">-${formatCurrency(sale.discount)}</td>
+              </tr>
+            ` : ''}
+            <tr class="total">
+              <td>Total:</td>
+              <td class="amount">${formatCurrency(sale.total)}</td>
+            </tr>
+            ${paymentMethod === 'cash' && amountPaid ? `
+              <tr>
+                <td>Amount Paid:</td>
+                <td class="amount">${formatCurrency(parseFloat(amountPaid))}</td>
+              </tr>
+              <tr>
+                <td>Change:</td>
+                <td class="amount">${formatCurrency(change)}</td>
+              </tr>
+            ` : ''}
+          </table>
+          
+          <div class="divider"></div>
+          
+          <div>
+            <div>Payment Method: ${paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Digital Payment'}</div>
+            ${sale.note ? `<div>Note: ${sale.note}</div>` : ''}
+          </div>
+          
+          <div class="footer">
+            <p>Thank you for your business!</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Print the receipt
+    printReceipt(receiptHTML);
   };
 
   return (
@@ -608,3 +747,4 @@ export default function POS() {
     </div>
   );
 }
+

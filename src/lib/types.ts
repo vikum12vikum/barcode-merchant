@@ -76,6 +76,15 @@ export interface CashInHand {
   lastUpdated: string;
 }
 
+export interface CashTransaction {
+  id: string;
+  amount: number;
+  type: 'deposit' | 'withdrawal';
+  reason: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface InventoryAdjustment {
   productId: string;
   quantity: number;
@@ -96,6 +105,19 @@ export interface Loan {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  // Borrowed goods support
+  type: 'cash' | 'goods';
+  items?: BorrowedItem[];
+}
+
+export interface BorrowedItem {
+  id: string;
+  loanId: string;
+  productId: string;
+  product: Product;
+  quantity: number;
+  returnedQuantity: number;
+  status: 'borrowed' | 'partially_returned' | 'returned';
 }
 
 export interface LoanPayment {
@@ -115,4 +137,12 @@ export interface LoanSummary {
   totalAmountLent: number;
   totalAmountOutstanding: number;
   totalAmountRepaid: number;
+}
+
+export interface ReportFilters {
+  startDate: string;
+  endDate: string;
+  category?: string;
+  productId?: string;
+  customerId?: string;
 }

@@ -16,7 +16,9 @@ import {
   X,
   ReceiptText,
   Wallet,
-  CreditCard
+  CreditCard,
+  Banknote,
+  FileText
 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
@@ -107,15 +109,15 @@ export function Navigation() {
       to: "/loans",
     },
     {
-      icon: <BarChart3 size={18} />,
+      icon: <Banknote size={18} />,
+      label: "Cash in Hand",
+      to: "/cash-in-hand",
+    },
+    {
+      icon: <FileText size={18} />,
       label: "Reports",
       to: "/reports",
       admin: true,
-    },
-    {
-      icon: <Wallet size={18} />,
-      label: "Cash in Hand",
-      to: "/cash-in-hand",
     },
     {
       icon: <Settings size={18} />,

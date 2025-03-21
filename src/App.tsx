@@ -1,14 +1,8 @@
 
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import { setupOfflineSync } from "@/lib/api";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
-
-// Pages
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { Toaster } from "./components/ui/sonner";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
@@ -17,141 +11,183 @@ import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import Loans from "./pages/Loans";
 import LoanDetails from "./pages/LoanDetails";
+import CashInHand from "./pages/CashInHand";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
+import Index from "./pages/Index";
 import { Navigation } from "./components/layout/Navigation";
+import { setupOfflineSync } from "./lib/api";
+import "./App.css";
 
+// Initialize query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
       retry: 1,
+      refetchOnWindowFocus: false,
     },
   },
 });
 
-// Protected route component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+// Setup offline sync
+setupOfflineSync();
 
-  if (isLoading) {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+      <div className="h-screen w-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 rounded-full border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  return user ? <>{children}</> : <Navigate to="/login" />;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center">
+        <div className="animate-spin h-12 w-12 rounded-full border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
+  return user && isAdmin ? <>{children}</> : <Navigate to="/dashboard" />;
+}
+
+function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen">
       <Navigation />
-      <main className="flex-1 p-6 overflow-auto">{children}</main>
+      <main className="flex-1 overflow-y-auto p-6">
+        {children}
+      </main>
     </div>
   );
 }
 
-// App wrapper with providers
-const AppWithProviders = () => {
-  useEffect(() => {
-    // Set up offline sync
-    setupOfflineSync();
-  }, []);
-
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-        <Toaster />
-        <Sonner position="top-right" />
-      </TooltipProvider>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Dashboard />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pos"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <POS />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/products"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Products />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Customers />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sales"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Sales />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/loans"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <Loans />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/loans/:id"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <LoanDetails />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cash-in-hand"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <CashInHand />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <AdminRoute>
+                  <AppLayout>
+                    <Reports />
+                  </AppLayout>
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <AdminRoute>
+                  <AppLayout>
+                    <div className="h-full flex items-center justify-center">
+                      <h1 className="text-3xl font-bold">Settings (Coming Soon)</h1>
+                    </div>
+                  </AppLayout>
+                </AdminRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Router>
+        <Toaster position="top-right" expand={false} richColors />
+      </AuthProvider>
     </QueryClientProvider>
-  );
-};
-
-// Routes component
-function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      
-      <Route
-        path="/"
-        element={<Navigate to="/dashboard" replace />}
-      />
-      
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/pos"
-        element={
-          <ProtectedRoute>
-            <POS />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/products"
-        element={
-          <ProtectedRoute>
-            <Products />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/customers"
-        element={
-          <ProtectedRoute>
-            <Customers />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/sales"
-        element={
-          <ProtectedRoute>
-            <Sales />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/loans"
-        element={
-          <ProtectedRoute>
-            <Loans />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route
-        path="/loans/:id"
-        element={
-          <ProtectedRoute>
-            <LoanDetails />
-          </ProtectedRoute>
-        }
-      />
-      
-      <Route path="*" element={<NotFound />} />
-    </Routes>
   );
 }
 
-export default AppWithProviders;
+export default App;
