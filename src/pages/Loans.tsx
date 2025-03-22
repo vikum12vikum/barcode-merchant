@@ -1,6 +1,7 @@
+
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLoans, getCustomers, createLoan, updateLoan, deleteLoan, getLoanSummary } from "@/lib/api";
+import { getLoans, getCustomers, updateLoan, deleteLoan, getLoanSummary } from "@/lib/api";
 import { Loan, Customer, LoanSummary } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
 import { format, parseISO } from "date-fns";
@@ -42,7 +43,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { 
-  Plus, 
   Search, 
   CreditCard,
   DollarSign,
@@ -78,7 +78,6 @@ export default function Loans() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
@@ -110,23 +109,6 @@ export default function Loans() {
   const { data: loanSummary } = useQuery({
     queryKey: ["loanSummary"],
     queryFn: getLoanSummary,
-  });
-
-  // Create loan mutation
-  const createLoanMutation = useMutation({
-    mutationFn: (loan: Omit<Loan, "id" | "createdAt" | "updatedAt" | "customer">) =>
-      createLoan(loan),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loans"] });
-      queryClient.invalidateQueries({ queryKey: ["loanSummary"] });
-      toast.success("Loan created successfully");
-      setIsCreateDialogOpen(false);
-      resetForm();
-    },
-    onError: (error) => {
-      toast.error("Failed to create loan");
-      console.error(error);
-    },
   });
 
   // Update loan mutation
@@ -188,62 +170,6 @@ export default function Loans() {
   // Handle select change
   const handleSelectChange = (name: string, value: string) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Reset form
-  const resetForm = () => {
-    setFormData({
-      customerId: "",
-      amount: 0,
-      remainingAmount: 0,
-      dueDate: "",
-      installmentFrequency: "monthly",
-      installmentAmount: 0,
-      notes: "",
-      status: "active",
-    });
-  };
-
-  // Calculate remaining amount
-  const calculateRemainingAmount = (amount: number) => {
-    setFormData((prev) => ({ ...prev, amount, remainingAmount: amount }));
-  };
-
-  // Calculate installment amount
-  const calculateInstallmentAmount = (amount: number, frequency: string) => {
-    // Simple calculation based on frequency
-    let installment = 0;
-    
-    switch (frequency) {
-      case "daily":
-        installment = amount / 30; // Roughly a month of daily payments
-        break;
-      case "weekly":
-        installment = amount / 4; // Roughly a month of weekly payments
-        break;
-      case "monthly":
-        installment = amount; // One payment
-        break;
-      default:
-        installment = amount;
-    }
-    
-    setFormData((prev) => ({ 
-      ...prev, 
-      installmentAmount: Math.round(installment * 100) / 100 
-    }));
-  };
-
-  // Handle create loan
-  const handleCreateLoan = (data) => {
-    // When creating a new loan, ensure it has the 'type' field
-    const newLoan = {
-      ...data,
-      type: "cash", // Add this line to fix the error
-      remainingAmount: data.amount
-    };
-    
-    createLoanMutation.mutate(newLoan);
   };
 
   // Handle edit loan
@@ -335,11 +261,8 @@ export default function Loans() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Loans</h1>
-          <p className="text-muted-foreground">Manage customer loans and payments</p>
+          <p className="text-muted-foreground">Manage existing customer loans and payments</p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus size={16} className="mr-2" /> New Loan
-        </Button>
       </div>
 
       {loanSummary && (
@@ -439,7 +362,7 @@ export default function Loans() {
                     <Users className="h-8 w-8 mx-auto text-muted-foreground/30" />
                     <p className="mt-2 text-lg font-medium">No loans found</p>
                     <p className="text-sm text-muted-foreground">
-                      {searchQuery ? `No results for "${searchQuery}"` : "Create a new loan to get started"}
+                      {searchQuery ? `No results for "${searchQuery}"` : "Loans can be created during checkout"}
                     </p>
                   </TableCell>
                 </TableRow>
@@ -484,130 +407,6 @@ export default function Loans() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Create Loan Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Loan</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="customerId">Customer</Label>
-              <Select
-                onValueChange={(value) => handleSelectChange('customerId', value)}
-                value={formData.customerId}
-              >
-                <SelectTrigger id="customerId">
-                  <SelectValue placeholder="Select a customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers?.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="amount">Loan Amount</Label>
-              <Input
-                id="amount"
-                name="amount"
-                type="number"
-                value={formData.amount}
-                onChange={(e) => {
-                  const amount = parseFloat(e.target.value) || 0;
-                  calculateRemainingAmount(amount);
-                  calculateInstallmentAmount(amount, formData.installmentFrequency);
-                }}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dueDate">Due Date</Label>
-              <Input
-                id="dueDate"
-                name="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={handleFormChange}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="installmentFrequency">Payment Frequency</Label>
-              <Select
-                onValueChange={(value) => {
-                  handleSelectChange('installmentFrequency', value);
-                  calculateInstallmentAmount(formData.amount, value);
-                }}
-                value={formData.installmentFrequency}
-              >
-                <SelectTrigger id="installmentFrequency">
-                  <SelectValue placeholder="Select frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="installmentAmount">Installment Amount</Label>
-              <Input
-                id="installmentAmount"
-                name="installmentAmount"
-                type="number"
-                value={formData.installmentAmount}
-                onChange={handleFormChange}
-                placeholder="0.00"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
-                onChange={handleFormChange}
-                placeholder="Add any notes about this loan"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsCreateDialogOpen(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateLoan}
-              disabled={
-                createLoanMutation.isPending || 
-                !formData.customerId || 
-                formData.amount <= 0 ||
-                !formData.dueDate
-              }
-            >
-              {createLoanMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Loan"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Edit Loan Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
