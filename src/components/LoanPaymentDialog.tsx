@@ -71,7 +71,7 @@ export default function LoanPaymentDialog({
           ) : activeLoans.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground">This customer has no active loans.</p>
-              <p className="text-sm mt-2">A new loan will be created during checkout.</p>
+              <p className="text-sm mt-2">You need to create a loan for this customer first.</p>
             </div>
           ) : (
             <>
@@ -120,7 +120,7 @@ export default function LoanPaymentDialog({
           </Button>
           <Button
             onClick={() => onConfirm(selectedLoanId)}
-            disabled={isLoading || (activeLoans.length > 0 && !selectedLoanId)}
+            disabled={isLoading || activeLoans.length === 0 || !selectedLoanId}
           >
             {isLoading ? (
               <>
@@ -128,7 +128,7 @@ export default function LoanPaymentDialog({
                 Processing...
               </>
             ) : (
-              activeLoans.length === 0 ? "Create New Loan" : "Confirm"
+              "Confirm"
             )}
           </Button>
         </DialogFooter>
