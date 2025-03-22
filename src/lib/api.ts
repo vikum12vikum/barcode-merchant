@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { 
   Product, 
@@ -184,6 +183,33 @@ export async function addSaleToLoan(loanId: string, sale: Omit<Sale, "id" | "cre
   return fetchApi<Sale>(`/api/loans/${loanId}/sales`, {
     method: "POST",
     body: JSON.stringify(sale),
+  });
+}
+
+// Create a new loan and add the sale to it in one operation
+export async function createLoanWithSale(
+  customerId: string, 
+  loanData: {
+    installmentFrequency: "daily" | "weekly" | "monthly";
+    installmentAmount: number;
+    dueDate: string;
+    notes?: string;
+  }, 
+  sale: Omit<Sale, "id" | "createdAt" | "updatedAt">
+): Promise<{loan: Loan, sale: Sale}> {
+  return fetchApi<{loan: Loan, sale: Sale}>("/api/loans/with-sale", {
+    method: "POST",
+    body: JSON.stringify({
+      customerId,
+      loan: {
+        ...loanData,
+        amount: sale.total,
+        remainingAmount: sale.total,
+        status: 'active',
+        type: 'goods'
+      },
+      sale
+    }),
   });
 }
 
