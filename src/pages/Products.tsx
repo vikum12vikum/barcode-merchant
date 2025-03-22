@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/context/AuthContext";
@@ -31,7 +30,6 @@ import {
   Search,
   Package,
   Loader2,
-  ChevronDown,
   Filter,
 } from "lucide-react";
 import {
@@ -42,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Products() {
   const { isAdmin } = useAuth();
@@ -53,6 +52,7 @@ export default function Products() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     barcode: "",
@@ -143,6 +143,9 @@ export default function Products() {
   // Handle category change in form
   const handleCategoryChange = (value: string) => {
     setFormData((prev) => ({ ...prev, category: value }));
+    if (value !== "new") {
+      setNewCategoryName("");
+    }
   };
 
   // Reset form
@@ -155,6 +158,7 @@ export default function Products() {
       lowStockThreshold: "",
       category: "",
     });
+    setNewCategoryName("");
   };
 
   // Handle create product
@@ -165,7 +169,7 @@ export default function Products() {
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       lowStockThreshold: parseInt(formData.lowStockThreshold),
-      category: formData.category,
+      category: formData.category === "new" ? newCategoryName : formData.category,
     };
 
     createProductMutation.mutate(newProduct);
@@ -195,7 +199,7 @@ export default function Products() {
       price: parseFloat(formData.price),
       stock: parseInt(formData.stock),
       lowStockThreshold: parseInt(formData.lowStockThreshold),
-      category: formData.category,
+      category: formData.category === "new" ? newCategoryName : formData.category,
     };
 
     updateProductMutation.mutate({
@@ -235,6 +239,260 @@ export default function Products() {
       }
     }
   };
+
+  // Modify the dialog content for create product
+  const createDialogContent = (
+    <>
+      <div className="grid gap-4 py-4">
+        <div className="grid gap-2">
+          <Label htmlFor="name">Product Name</Label>
+          <Input
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleFormChange}
+            placeholder="Enter product name"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="barcode">Barcode</Label>
+          <Input
+            id="barcode"
+            name="barcode"
+            value={formData.barcode}
+            onChange={handleFormChange}
+            placeholder="Enter barcode"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="price">Price</Label>
+            <Input
+              id="price"
+              name="price"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.price}
+              onChange={handleFormChange}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="stock">Stock Quantity</Label>
+            <Input
+              id="stock"
+              name="stock"
+              type="number"
+              min="0"
+              step="1"
+              value={formData.stock}
+              onChange={handleFormChange}
+              placeholder="0"
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="lowStockThreshold">Low Stock Threshold</Label>
+            <Input
+              id="lowStockThreshold"
+              name="lowStockThreshold"
+              type="number"
+              min="0"
+              step="1"
+              value={formData.lowStockThreshold}
+              onChange={handleFormChange}
+              placeholder="5"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Category</Label>
+            <Select
+              value={formData.category}
+              onValueChange={handleCategoryChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+                <SelectItem value="new">+ New Category</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {formData.category === "new" && (
+          <div className="grid gap-2">
+            <Label htmlFor="newCategory">New Category Name</Label>
+            <Input
+              id="newCategory"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter new category name"
+            />
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsCreateDialogOpen(false);
+            resetForm();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleCreateProduct}
+          disabled={createProductMutation.isPending || 
+            !formData.name || 
+            !formData.price || 
+            (formData.category === "new" && !newCategoryName)}
+        >
+          {createProductMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            "Create Product"
+          )}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+
+  // Modify the dialog content for edit product
+  const editDialogContent = (
+    <>
+      <div className="grid gap-4 py-4">
+        <div className="grid gap-2">
+          <Label htmlFor="edit-name">Product Name</Label>
+          <Input
+            id="edit-name"
+            name="name"
+            value={formData.name}
+            onChange={handleFormChange}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="edit-barcode">Barcode</Label>
+          <Input
+            id="edit-barcode"
+            name="barcode"
+            value={formData.barcode}
+            onChange={handleFormChange}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="edit-price">Price</Label>
+            <Input
+              id="edit-price"
+              name="price"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.price}
+              onChange={handleFormChange}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="edit-stock">Stock Quantity</Label>
+            <Input
+              id="edit-stock"
+              name="stock"
+              type="number"
+              min="0"
+              step="1"
+              value={formData.stock}
+              onChange={handleFormChange}
+            />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="edit-lowStockThreshold">
+              Low Stock Threshold
+            </Label>
+            <Input
+              id="edit-lowStockThreshold"
+              name="lowStockThreshold"
+              type="number"
+              min="0"
+              step="1"
+              value={formData.lowStockThreshold}
+              onChange={handleFormChange}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>Category</Label>
+            <Select
+              value={formData.category}
+              onValueChange={handleCategoryChange}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+                <SelectItem value="new">+ New Category</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {formData.category === "new" && (
+          <div className="grid gap-2">
+            <Label htmlFor="edit-newCategory">New Category Name</Label>
+            <Input
+              id="edit-newCategory"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter new category name"
+            />
+          </div>
+        )}
+      </div>
+      <DialogFooter>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setIsEditDialogOpen(false);
+            setEditingProduct(null);
+            resetForm();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleUpdateProduct}
+          disabled={updateProductMutation.isPending || 
+            !formData.name || 
+            !formData.price || 
+            (formData.category === "new" && !newCategoryName)}
+        >
+          {updateProductMutation.isPending ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Updating...
+            </>
+          ) : (
+            "Update Product"
+          )}
+        </Button>
+      </DialogFooter>
+    </>
+  );
 
   return (
     <div className="space-y-6 pb-8">
@@ -322,126 +580,7 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>Add New Product</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Product Name</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleFormChange}
-                placeholder="Enter product name"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="barcode">Barcode</Label>
-              <Input
-                id="barcode"
-                name="barcode"
-                value={formData.barcode}
-                onChange={handleFormChange}
-                placeholder="Enter barcode"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="price">Price</Label>
-                <Input
-                  id="price"
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={handleFormChange}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  name="stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.stock}
-                  onChange={handleFormChange}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="lowStockThreshold">Low Stock Threshold</Label>
-                <Input
-                  id="lowStockThreshold"
-                  name="lowStockThreshold"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.lowStockThreshold}
-                  onChange={handleFormChange}
-                  placeholder="5"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={handleCategoryChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="new">+ New Category</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {formData.category === "new" && (
-              <div className="grid gap-2">
-                <Label htmlFor="newCategory">New Category Name</Label>
-                <Input
-                  id="newCategory"
-                  name="category"
-                  value={formData.category === "new" ? "" : formData.category}
-                  onChange={handleFormChange}
-                  placeholder="Enter new category name"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsCreateDialogOpen(false);
-                resetForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateProduct}
-              disabled={createProductMutation.isPending}
-            >
-              {createProductMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create Product"
-              )}
-            </Button>
-          </DialogFooter>
+          {createDialogContent}
         </DialogContent>
       </Dialog>
 
@@ -451,123 +590,7 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-name">Product Name</Label>
-              <Input
-                id="edit-name"
-                name="name"
-                value={formData.name}
-                onChange={handleFormChange}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-barcode">Barcode</Label>
-              <Input
-                id="edit-barcode"
-                name="barcode"
-                value={formData.barcode}
-                onChange={handleFormChange}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-price">Price</Label>
-                <Input
-                  id="edit-price"
-                  name="price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={handleFormChange}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-stock">Stock Quantity</Label>
-                <Input
-                  id="edit-stock"
-                  name="stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.stock}
-                  onChange={handleFormChange}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="edit-lowStockThreshold">
-                  Low Stock Threshold
-                </Label>
-                <Input
-                  id="edit-lowStockThreshold"
-                  name="lowStockThreshold"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={formData.lowStockThreshold}
-                  onChange={handleFormChange}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Category</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={handleCategoryChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="new">+ New Category</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {formData.category === "new" && (
-              <div className="grid gap-2">
-                <Label htmlFor="edit-newCategory">New Category Name</Label>
-                <Input
-                  id="edit-newCategory"
-                  name="category"
-                  value={formData.category === "new" ? "" : formData.category}
-                  onChange={handleFormChange}
-                  placeholder="Enter new category name"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsEditDialogOpen(false);
-                setEditingProduct(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleUpdateProduct}
-              disabled={updateProductMutation.isPending}
-            >
-              {updateProductMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Product"
-              )}
-            </Button>
-          </DialogFooter>
+          {editDialogContent}
         </DialogContent>
       </Dialog>
 

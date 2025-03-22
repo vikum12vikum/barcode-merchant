@@ -169,18 +169,6 @@ function App() {
                 </AdminRoute>
               }
             />
-            <Route
-              path="/settings"
-              element={
-                <AdminRoute>
-                  <AppLayout>
-                    <div className="h-full flex items-center justify-center">
-                      <h1 className="text-3xl font-bold">Settings (Coming Soon)</h1>
-                    </div>
-                  </AppLayout>
-                </AdminRoute>
-              }
-            />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <Toaster position="top-right" expand={false} richColors />

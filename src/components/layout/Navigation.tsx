@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -9,13 +8,10 @@ import {
   Package, 
   Users, 
   BarChart3, 
-  ClipboardList, 
-  Settings, 
   LogOut,
   Menu,
   X,
   ReceiptText,
-  Wallet,
   CreditCard,
   Banknote,
   FileText
@@ -117,12 +113,6 @@ export function Navigation() {
       icon: <FileText size={18} />,
       label: "Reports",
       to: "/reports",
-      admin: true,
-    },
-    {
-      icon: <Settings size={18} />,
-      label: "Settings",
-      to: "/settings",
       admin: true,
     },
   ];

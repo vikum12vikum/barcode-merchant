@@ -45,13 +45,13 @@ export interface Sale {
   invoiceNumber: string;
   customerId?: string;
   customer?: Customer;
-  loanId?: string;  // Added loanId for purchases added to loans
+  loanId?: string;
   items: SaleItem[];
   subtotal: number;
   discount: number;
   tax: number;
   total: number;
-  paymentMethod: 'cash' | 'card' | 'digital' | 'loan';  // Added 'loan' payment method
+  paymentMethod: 'cash' | 'card' | 'digital' | 'loan';
   status: 'completed' | 'pending' | 'cancelled';
   note?: string;
   createdAt: string;
@@ -106,10 +106,8 @@ export interface Loan {
   notes?: string;
   createdAt: string;
   updatedAt: string;
-  // Borrowed goods support
   type: 'cash' | 'goods';
   items?: BorrowedItem[];
-  // Added for related sales
   sales?: Sale[];
 }
 

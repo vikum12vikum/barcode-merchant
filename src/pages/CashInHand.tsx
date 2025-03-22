@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -60,6 +61,7 @@ export default function CashInHand() {
   const [isWithdrawalDialogOpen, setIsWithdrawalDialogOpen] = useState(false);
   const [transactionAmount, setTransactionAmount] = useState("");
   const [transactionReason, setTransactionReason] = useState("");
+  const [customReason, setCustomReason] = useState("");
 
   // Fetch cash in hand
   const { data: cashInHand, isLoading: isCashInHandLoading } = useQuery({
@@ -80,7 +82,7 @@ export default function CashInHand() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cashInHand"] });
       queryClient.invalidateQueries({ queryKey: ["cashTransactions"] });
-      toast.success(`Cash ${transactionAmount} ${transactionAmount === 'deposit' ? 'added to' : 'removed from'} register`);
+      toast.success(`Cash ${transactionAmount} ${transactionReason === 'deposit' ? 'added to' : 'removed from'} register`);
       resetForm();
     },
     onError: (error) => {
@@ -93,8 +95,17 @@ export default function CashInHand() {
   const resetForm = () => {
     setTransactionAmount("");
     setTransactionReason("");
+    setCustomReason("");
     setIsDepositDialogOpen(false);
     setIsWithdrawalDialogOpen(false);
+  };
+
+  // Get final reason (either selected from dropdown or custom)
+  const getFinalReason = () => {
+    if (transactionReason === 'Other') {
+      return customReason;
+    }
+    return transactionReason;
   };
 
   // Handle deposit
@@ -105,10 +116,16 @@ export default function CashInHand() {
       return;
     }
 
+    const reason = getFinalReason();
+    if (!reason) {
+      toast.error("Please provide a reason");
+      return;
+    }
+
     updateCashMutation.mutate({
       amount,
       type: 'deposit',
-      reason: transactionReason,
+      reason,
     });
   };
 
@@ -125,10 +142,16 @@ export default function CashInHand() {
       return;
     }
 
+    const reason = getFinalReason();
+    if (!reason) {
+      toast.error("Please provide a reason");
+      return;
+    }
+
     updateCashMutation.mutate({
       amount,
       type: 'withdrawal',
-      reason: transactionReason,
+      reason,
     });
   };
 
@@ -157,6 +180,10 @@ export default function CashInHand() {
             th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
             th { background-color: #f2f2f2; }
             .footer { margin-top: 30px; text-align: center; font-size: 12px; }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+              button { display: none; }
+            }
           </style>
         </head>
         <body>
@@ -197,27 +224,50 @@ export default function CashInHand() {
           
           <div class="footer">
             <p>This is an official cash register report. Please retain for your records.</p>
+            <button onclick="window.print()" style="padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Print Report</button>
           </div>
+          <script>
+            // Auto print and close
+            window.onload = function() {
+              window.print();
+            }
+          </script>
         </body>
       </html>
     `;
     
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
+    // Create a new iframe for printing instead of a new window
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    
+    document.body.appendChild(printFrame);
+    
+    const frameDoc = printFrame.contentWindow?.document || printFrame.contentDocument;
+    if (frameDoc) {
+      frameDoc.open();
+      frameDoc.write(printContent);
+      frameDoc.close();
       
       // Wait for resources to load before printing
-      printWindow.onload = function() {
-        printWindow.print();
-        // Close the window after printing (some browsers might block this)
-        printWindow.onafterprint = function() {
-          printWindow.close();
-        };
-      };
-    } else {
-      toast.error("Unable to open print window. Please check your popup blocker settings.");
+      setTimeout(() => {
+        try {
+          printFrame.contentWindow?.print();
+          
+          // Remove the iframe after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+          }, 1000);
+        } catch (error) {
+          console.error("Printing failed", error);
+          toast.error("Printing failed. Please try again.");
+          document.body.removeChild(printFrame);
+        }
+      }, 500);
     }
     
     toast.success("Cash report sent to printer");
@@ -388,6 +438,7 @@ export default function CashInHand() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Cash to Register</DialogTitle>
+            <DialogDescription>Enter the amount and reason for adding cash to the register.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -419,11 +470,13 @@ export default function CashInHand() {
                 </SelectContent>
               </Select>
               {transactionReason === 'Other' && (
-                <Textarea
-                  placeholder="Please specify the reason"
-                  className="mt-2"
-                  onChange={(e) => setTransactionReason(e.target.value)}
-                />
+                <div className="mt-2">
+                  <Textarea
+                    placeholder="Please specify the reason"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -436,7 +489,12 @@ export default function CashInHand() {
             </Button>
             <Button
               onClick={handleDeposit}
-              disabled={updateCashMutation.isPending || !transactionAmount || !transactionReason}
+              disabled={
+                updateCashMutation.isPending || 
+                !transactionAmount || 
+                !transactionReason || 
+                (transactionReason === 'Other' && !customReason)
+              }
             >
               {updateCashMutation.isPending ? (
                 <>
@@ -457,6 +515,7 @@ export default function CashInHand() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Remove Cash from Register</DialogTitle>
+            <DialogDescription>Enter the amount and reason for removing cash from the register.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -494,11 +553,13 @@ export default function CashInHand() {
                 </SelectContent>
               </Select>
               {transactionReason === 'Other' && (
-                <Textarea
-                  placeholder="Please specify the reason"
-                  className="mt-2"
-                  onChange={(e) => setTransactionReason(e.target.value)}
-                />
+                <div className="mt-2">
+                  <Textarea
+                    placeholder="Please specify the reason"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -516,6 +577,7 @@ export default function CashInHand() {
                 updateCashMutation.isPending || 
                 !transactionAmount || 
                 !transactionReason || 
+                (transactionReason === 'Other' && !customReason) ||
                 (cashInHand && parseFloat(transactionAmount) > cashInHand.amount)
               }
             >

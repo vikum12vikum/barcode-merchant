@@ -1,12 +1,12 @@
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loan } from "@/lib/types";
 import { Loader2 } from "lucide-react";
+import { format } from "date-fns";
 
 interface LoanPaymentDialogProps {
   open: boolean;
@@ -14,6 +14,8 @@ interface LoanPaymentDialogProps {
   loans: Loan[];
   onConfirm: (loanId: string) => void;
   isLoading?: boolean;
+  title?: string;
+  description?: string;
 }
 
 export default function LoanPaymentDialog({
@@ -21,9 +23,12 @@ export default function LoanPaymentDialog({
   onOpenChange,
   loans,
   onConfirm,
-  isLoading = false
+  isLoading = false,
+  title = "Add to Customer Loan",
+  description = "Select an active loan to add this purchase to."
 }: LoanPaymentDialogProps) {
   const [selectedLoanId, setSelectedLoanId] = useState<string>("");
+  const activeLoans = loans.filter(loan => loan.status === 'active');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -31,6 +36,16 @@ export default function LoanPaymentDialog({
       currency: "USD",
     }).format(amount);
   };
+
+  // Reset state when dialog opens or changes
+  useEffect(() => {
+    if (open && activeLoans.length === 1) {
+      // Auto-select if there's only one active loan
+      setSelectedLoanId(activeLoans[0].id);
+    } else if (!open) {
+      setSelectedLoanId("");
+    }
+  }, [open, activeLoans]);
 
   // Reset state when dialog closes
   const handleOpenChange = (open: boolean) => {
@@ -44,10 +59,11 @@ export default function LoanPaymentDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add to Customer Loan</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          {loans.length === 0 ? (
+          {activeLoans.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground">This customer has no active loans.</p>
               <p className="text-sm mt-2">You need to create a loan for this customer first.</p>
@@ -64,9 +80,9 @@ export default function LoanPaymentDialog({
                     <SelectValue placeholder="Select a loan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {loans.map((loan) => (
+                    {activeLoans.map((loan) => (
                       <SelectItem key={loan.id} value={loan.id}>
-                        {formatCurrency(loan.remainingAmount)} - Due: {new Date(loan.dueDate).toLocaleDateString()}
+                        {formatCurrency(loan.remainingAmount)} - Due: {format(new Date(loan.dueDate), 'PP')}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -76,12 +92,13 @@ export default function LoanPaymentDialog({
               {selectedLoanId && (
                 <div className="bg-muted p-3 rounded-md text-sm">
                   <p className="font-medium mb-1">Selected Loan Details</p>
-                  {loans.filter(loan => loan.id === selectedLoanId).map(loan => (
+                  {activeLoans.filter(loan => loan.id === selectedLoanId).map(loan => (
                     <div key={loan.id} className="space-y-1">
                       <p>Total Amount: {formatCurrency(loan.amount)}</p>
                       <p>Remaining: {formatCurrency(loan.remainingAmount)}</p>
                       <p>Type: {loan.type === 'cash' ? 'Cash Loan' : 'Goods Loan'}</p>
-                      <p>Status: {loan.status}</p>
+                      <p>Due Date: {format(new Date(loan.dueDate), 'PPP')}</p>
+                      <p>Payment: {loan.installmentFrequency} ({formatCurrency(loan.installmentAmount)})</p>
                     </div>
                   ))}
                 </div>
@@ -98,7 +115,7 @@ export default function LoanPaymentDialog({
           </Button>
           <Button
             onClick={() => onConfirm(selectedLoanId)}
-            disabled={isLoading || loans.length === 0 || !selectedLoanId}
+            disabled={isLoading || activeLoans.length === 0 || !selectedLoanId}
           >
             {isLoading ? (
               <>
