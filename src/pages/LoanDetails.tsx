@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getLoan, getLoanPayments, createLoanPayment, updateLoan } from "@/lib/api";
-import { Loan, LoanPayment } from "@/lib/types";
+import { Loan, LoanPayment, Sale } from "@/lib/types";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -43,6 +43,9 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
+  ReceiptText,
+  Banknote,
+  Wallet,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
@@ -81,6 +84,7 @@ export default function LoanDetails() {
     status: "",
     notes: "",
   });
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Fetch loan details
   const { 
@@ -246,6 +250,30 @@ export default function LoanDetails() {
     return payments.reduce((total, payment) => total + payment.amount, 0);
   };
 
+  // Get payment method icon
+  const getPaymentIcon = (method: string) => {
+    switch (method) {
+      case "cash":
+        return <Banknote size={14} />;
+      case "card":
+        return <CreditCard size={14} />;
+      case "digital":
+        return <Wallet size={14} />;
+      default:
+        return <CreditCard size={14} />;
+    }
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short", 
+      day: "numeric", 
+      year: "numeric"
+    });
+  };
+
   if (isLoanLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -293,151 +321,232 @@ export default function LoanDetails() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex justify-between items-center">
-              <span>Loan Summary</span>
-              {getStatusBadge(loan.status)}
-            </CardTitle>
-            <CardDescription>Overview of the current loan</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Payment Progress</p>
-              <div className="space-y-2">
-                <Progress value={calculateProgress()} className="h-2" />
-                <div className="flex justify-between text-sm">
-                  <span>{formatCurrency(loan.amount - loan.remainingAmount)} paid</span>
-                  <span>{formatCurrency(loan.amount)} total</span>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="purchases">Purchases</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex justify-between items-center">
+                <span>Loan Summary</span>
+                {getStatusBadge(loan.status)}
+              </CardTitle>
+              <CardDescription>Overview of the current loan</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Payment Progress</p>
+                <div className="space-y-2">
+                  <Progress value={calculateProgress()} className="h-2" />
+                  <div className="flex justify-between text-sm">
+                    <span>{formatCurrency(loan.amount - loan.remainingAmount)} paid</span>
+                    <span>{formatCurrency(loan.amount)} total</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Remaining Amount</p>
-                <p className="text-xl font-bold">{formatCurrency(loan.remainingAmount)}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Remaining Amount</p>
+                  <p className="text-xl font-bold">{formatCurrency(loan.remainingAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Due Date</p>
+                  <p className="text-xl font-bold">{format(new Date(loan.dueDate), 'PP')}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Due Date</p>
-                <p className="text-xl font-bold">{format(new Date(loan.dueDate), 'PP')}</p>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Payment Frequency</p>
-                <p className="text-md font-medium capitalize">{loan.installmentFrequency}</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment Frequency</p>
+                  <p className="text-md font-medium capitalize">{loan.installmentFrequency}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Installment Amount</p>
+                  <p className="text-md font-medium">{formatCurrency(loan.installmentAmount)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Installment Amount</p>
-                <p className="text-md font-medium">{formatCurrency(loan.installmentAmount)}</p>
-              </div>
-            </div>
 
-            {loan.notes && (
-              <div>
-                <p className="text-sm text-muted-foreground">Notes</p>
-                <p className="text-sm whitespace-pre-line border rounded-md p-2 bg-muted/30 mt-1">
-                  {loan.notes}
-                </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Loan Type</p>
+                  <p className="text-md font-medium capitalize">{loan.type}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Created Date</p>
+                  <p className="text-md font-medium">{format(new Date(loan.createdAt), 'PP')}</p>
+                </div>
               </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex gap-2 border-t pt-4">
-            <Button className="flex-1" onClick={() => setIsPaymentDialogOpen(true)}>
-              <DollarSign className="mr-2 h-4 w-4" />
-              Record Payment
-            </Button>
-            <div className="flex-1 flex gap-2">
-              {loan.status !== 'paid' && (
-                <Button 
-                  variant="outline" 
-                  className="flex-1" 
-                  onClick={() => openStatusDialog('paid')}
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Mark Paid
-                </Button>
+
+              {loan.notes && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Notes</p>
+                  <p className="text-sm whitespace-pre-line border rounded-md p-2 bg-muted/30 mt-1">
+                    {loan.notes}
+                  </p>
+                </div>
               )}
-              {loan.status !== 'defaulted' && (
-                <Button 
-                  variant="outline" 
-                  className="flex-1 text-destructive border-destructive hover:bg-destructive/10" 
-                  onClick={() => openStatusDialog('defaulted')}
-                >
-                  <AlertTriangle className="mr-2 h-4 w-4" />
-                  Mark Defaulted
-                </Button>
-              )}
-            </div>
-          </CardFooter>
-        </Card>
+            </CardContent>
+            <CardFooter className="flex gap-2 border-t pt-4">
+              <Button className="flex-1" onClick={() => setIsPaymentDialogOpen(true)}>
+                <DollarSign className="mr-2 h-4 w-4" />
+                Record Payment
+              </Button>
+              <div className="flex-1 flex gap-2">
+                {loan.status !== 'paid' && (
+                  <Button 
+                    variant="outline" 
+                    className="flex-1" 
+                    onClick={() => openStatusDialog('paid')}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Mark Paid
+                  </Button>
+                )}
+                {loan.status !== 'defaulted' && (
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 text-destructive border-destructive hover:bg-destructive/10" 
+                    onClick={() => openStatusDialog('defaulted')}
+                  >
+                    <AlertTriangle className="mr-2 h-4 w-4" />
+                    Mark Defaulted
+                  </Button>
+                )}
+              </div>
+            </CardFooter>
+          </Card>
+        </TabsContent>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment History</CardTitle>
-            <CardDescription>
-              {payments?.length 
-                ? `${payments.length} payments recorded` 
-                : "No payments recorded yet"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isPaymentsLoading ? (
-              <div className="flex items-center justify-center h-40">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <p className="ml-2">Loading payments...</p>
-              </div>
-            ) : !payments?.length ? (
-              <div className="flex flex-col items-center justify-center h-40 text-center">
-                <Receipt className="h-12 w-12 text-muted-foreground/30 mb-2" />
-                <p className="text-muted-foreground">No payment records found</p>
-                <Button 
-                  variant="link"
-                  onClick={() => setIsPaymentDialogOpen(true)}
-                >
-                  Record first payment
-                </Button>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Method</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {payments.map((payment) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>{format(new Date(payment.paymentDate), 'PP')}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(payment.amount)}</TableCell>
-                      <TableCell className="capitalize">{payment.paymentMethod}</TableCell>
+        <TabsContent value="payments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment History</CardTitle>
+              <CardDescription>
+                {payments?.length 
+                  ? `${payments.length} payments recorded` 
+                  : "No payments recorded yet"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isPaymentsLoading ? (
+                <div className="flex items-center justify-center h-40">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                  <p className="ml-2">Loading payments...</p>
+                </div>
+              ) : !payments?.length ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <Receipt className="h-12 w-12 text-muted-foreground/30 mb-2" />
+                  <p className="text-muted-foreground">No payment records found</p>
+                  <Button 
+                    variant="link"
+                    onClick={() => setIsPaymentDialogOpen(true)}
+                  >
+                    Record first payment
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Method</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-          <CardFooter className="border-t p-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Paid</p>
-              <p className="text-xl font-bold">{formatCurrency(calculateTotalPaid())}</p>
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsPaymentDialogOpen(true)}
-              disabled={isPaymentsLoading}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Payment
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>{format(new Date(payment.paymentDate), 'PP')}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(payment.amount)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 capitalize">
+                            {getPaymentIcon(payment.paymentMethod)}
+                            <span>{payment.paymentMethod}</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+            <CardFooter className="border-t p-4 flex justify-between items-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Paid</p>
+                <p className="text-xl font-bold">{formatCurrency(calculateTotalPaid())}</p>
+              </div>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsPaymentDialogOpen(true)}
+                disabled={isPaymentsLoading}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Payment
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="purchases">
+          <Card>
+            <CardHeader>
+              <CardTitle>Purchases on Loan</CardTitle>
+              <CardDescription>
+                Items purchased using this loan account
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {!loan.sales || loan.sales.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-40 text-center">
+                  <ReceiptText className="h-12 w-12 text-muted-foreground/30 mb-2" />
+                  <p className="text-muted-foreground">No purchases have been made with this loan</p>
+                  <Button 
+                    variant="link"
+                    onClick={() => navigate('/pos')}
+                  >
+                    Go to POS to add purchases
+                  </Button>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loan.sales && loan.sales.map((sale) => (
+                      <TableRow key={sale.id} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/sales/${sale.id}`)}>
+                        <TableCell className="font-medium">{sale.invoiceNumber}</TableCell>
+                        <TableCell>{formatDate(sale.createdAt)}</TableCell>
+                        <TableCell>{sale.items.length} items</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(sale.total)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+            <CardFooter className="border-t p-4 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/pos')}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Purchase
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Record Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
@@ -534,8 +643,8 @@ export default function LoanDetails() {
           <DialogHeader>
             <DialogTitle>
               {statusFormData.status === 'paid' ? 'Mark Loan as Paid' : 
-               statusFormData.status === 'defaulted' ? 'Mark Loan as Defaulted' : 
-               'Update Loan Status'}
+              statusFormData.status === 'defaulted' ? 'Mark Loan as Defaulted' : 
+              'Update Loan Status'}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">

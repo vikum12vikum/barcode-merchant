@@ -32,6 +32,9 @@ import {
   ExternalLink,
   Filter,
   Loader2,
+  CreditCard as CardIcon,
+  DollarSign,
+  Receipt,
 } from "lucide-react";
 import { 
   Select, 
@@ -118,10 +121,192 @@ export default function Sales() {
 
   // Print invoice
   const printInvoice = (sale: Sale) => {
-    toast.info("Sending invoice to printer...");
-    setTimeout(() => {
-      toast.success("Invoice printed successfully");
-    }, 1500);
+    // Generate receipt HTML
+    const receiptHTML = generateReceiptHTML(sale);
+    
+    // Print the receipt
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(receiptHTML);
+      printWindow.document.close();
+      
+      // Wait for content to load before printing
+      printWindow.onload = function() {
+        printWindow.print();
+        // Close window after printing (some browsers might block this)
+        printWindow.onafterprint = function() {
+          printWindow.close();
+        };
+      };
+      
+      toast.success("Invoice sent to printer");
+    } else {
+      toast.error("Unable to open print window. Please check your popup blocker settings.");
+    }
+  };
+
+  // Generate receipt HTML
+  const generateReceiptHTML = (sale: Sale) => {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Invoice #${sale.invoiceNumber}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              line-height: 1.4;
+              margin: 0;
+              padding: 20px;
+              max-width: 800px;
+              margin: 0 auto;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              border-bottom: 1px solid #ddd;
+              padding-bottom: 10px;
+            }
+            .address {
+              margin-bottom: 20px;
+            }
+            .invoice-details {
+              margin-bottom: 20px;
+            }
+            .customer-details {
+              margin-bottom: 20px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+            }
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            th {
+              background-color: #f2f2f2;
+            }
+            .totals {
+              width: 40%;
+              margin-left: auto;
+            }
+            .totals table {
+              margin-bottom: 5px;
+            }
+            .totals td:first-child {
+              text-align: left;
+            }
+            .totals td:last-child {
+              text-align: right;
+            }
+            .loan-info {
+              margin-top: 15px;
+              padding: 10px;
+              border: 1px solid #ddd;
+              background-color: #f9f9f9;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              font-size: 12px;
+              color: #777;
+            }
+            @media print {
+              body {
+                padding: 0;
+                font-size: 12px;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h2>INVOICE</h2>
+            <h3>#${sale.invoiceNumber}</h3>
+          </div>
+          
+          <div class="invoice-details">
+            <strong>Date:</strong> ${formatDate(sale.createdAt)} ${formatTime(sale.createdAt)}<br>
+            <strong>Payment Method:</strong> ${sale.paymentMethod}${sale.paymentMethod === 'loan' ? ' (Credit)' : ''}<br>
+            <strong>Status:</strong> ${sale.status}
+          </div>
+          
+          <div class="customer-details">
+            <strong>Customer:</strong> ${sale.customer ? sale.customer.name : 'Guest Customer'}<br>
+            ${sale.customer?.phone ? `<strong>Phone:</strong> ${sale.customer.phone}<br>` : ''}
+            ${sale.customer?.email ? `<strong>Email:</strong> ${sale.customer.email}<br>` : ''}
+            ${sale.customer?.address ? `<strong>Address:</strong> ${sale.customer.address}<br>` : ''}
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sale.items.map(item => `
+                <tr>
+                  <td>${item.product.name}</td>
+                  <td>${item.quantity}</td>
+                  <td>${formatCurrency(item.price)}</td>
+                  <td>${formatCurrency(item.total)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <div class="totals">
+            <table>
+              <tr>
+                <td>Subtotal:</td>
+                <td>${formatCurrency(sale.subtotal)}</td>
+              </tr>
+              ${sale.discount > 0 ? `
+                <tr>
+                  <td>Discount:</td>
+                  <td>-${formatCurrency(sale.discount)}</td>
+                </tr>
+              ` : ''}
+              ${sale.tax > 0 ? `
+                <tr>
+                  <td>Tax:</td>
+                  <td>${formatCurrency(sale.tax)}</td>
+                </tr>
+              ` : ''}
+              <tr>
+                <td><strong>Total:</strong></td>
+                <td><strong>${formatCurrency(sale.total)}</strong></td>
+              </tr>
+            </table>
+          </div>
+          
+          ${sale.loanId ? `
+            <div class="loan-info">
+              <strong>Added to Loan:</strong> This purchase has been added to customer's loan account.<br>
+              <strong>Loan ID:</strong> ${sale.loanId}<br>
+              <strong>Payment Terms:</strong> As per loan agreement
+            </div>
+          ` : ''}
+          
+          ${sale.note ? `
+            <div style="margin-top: 20px;">
+              <strong>Note:</strong> ${sale.note}
+            </div>
+          ` : ''}
+          
+          <div class="footer">
+            <p>Thank you for your business!</p>
+          </div>
+        </body>
+      </html>
+    `;
   };
 
   // Download invoice
@@ -138,11 +323,13 @@ export default function Sales() {
       case "cash":
         return <Banknote size={14} />;
       case "card":
-        return <CreditCard size={14} />;
+        return <CardIcon size={14} />;
       case "digital":
         return <Wallet size={14} />;
+      case "loan":
+        return <Receipt size={14} />;
       default:
-        return <CreditCard size={14} />;
+        return <CardIcon size={14} />;
     }
   };
 
@@ -220,6 +407,7 @@ export default function Sales() {
               <SelectItem value="cash">Cash</SelectItem>
               <SelectItem value="card">Card</SelectItem>
               <SelectItem value="digital">Digital</SelectItem>
+              <SelectItem value="loan">Loan</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -284,6 +472,7 @@ export default function Sales() {
                       <div className="flex items-center gap-1 capitalize">
                         {getPaymentIcon(sale.paymentMethod)}
                         <span>{sale.paymentMethod}</span>
+                        {sale.loanId && <span className="text-xs text-blue-500 ml-1">(Loan)</span>}
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(sale.status)}</TableCell>
@@ -376,6 +565,7 @@ export default function Sales() {
                     <span className="block">
                       <span className="text-muted-foreground">Payment Method: </span>
                       {selectedSale.paymentMethod}
+                      {selectedSale.loanId && <span className="text-blue-500 ml-1">(Loan)</span>}
                     </span>
                   </p>
                 </div>
@@ -433,6 +623,13 @@ export default function Sales() {
                   </div>
                 </div>
               </div>
+              
+              {selectedSale.loanId && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md text-sm">
+                  <span className="font-medium text-blue-700">Loan Information: </span>
+                  This purchase has been added to customer's loan (ID: {selectedSale.loanId})
+                </div>
+              )}
               
               {selectedSale.note && (
                 <div className="bg-muted/50 p-3 rounded-md text-sm">

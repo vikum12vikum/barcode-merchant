@@ -179,6 +179,21 @@ export async function createSale(sale: Omit<Sale, "id" | "createdAt" | "updatedA
   });
 }
 
+// Add a sale to an existing loan
+export async function addSaleToLoan(loanId: string, sale: Omit<Sale, "id" | "createdAt" | "updatedAt">): Promise<Sale> {
+  return fetchApi<Sale>(`/api/loans/${loanId}/sales`, {
+    method: "POST",
+    body: JSON.stringify(sale),
+  });
+}
+
+// Get customer's active loans
+export async function getCustomerActiveLoans(customerId: string): Promise<Loan[]> {
+  const data = await fetchApi<Loan[]>(`/api/customers/${customerId}/loans/active`);
+  cacheResponse(`/api/customers/${customerId}/loans/active`, data);
+  return data;
+}
+
 // Reports
 export async function getDailySalesReport(): Promise<DailySalesReport[]> {
   const data = await fetchApi<DailySalesReport[]>("/api/reports/daily-sales");
@@ -320,6 +335,9 @@ export function setupOfflineSync() {
             break;
           case "CREATE_LOAN_PAYMENT":
             await createLoanPayment(action.data.loanId, action.data.payment);
+            break;
+          case "ADD_SALE_TO_LOAN":
+            await addSaleToLoan(action.data.loanId, action.data.sale);
             break;
           // Add other sync actions as needed
         }
