@@ -1,9 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getProducts, getCustomers, createSale, printReceipt } from "@/lib/api";
-import { Product, Customer, Sale } from "@/lib/types";
+import { getProducts, getCustomers, createSale, printReceipt, getCustomerActiveLoans } from "@/lib/api";
+import { Product, Customer, Sale, Loan } from "@/lib/types";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { ProductCard } from "@/components/ProductCard";
+import PrintFrame from "@/components/PrintFrame";
+import LoanPaymentDialog from "@/components/LoanPaymentDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -17,9 +20,6 @@ import {
   Minus,
   PercentIcon,
   Banknote,
-  CreditCard,
-  Wallet,
-  PrinterIcon,
   Loader2
 } from "lucide-react";
 import {
@@ -63,11 +63,15 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [isLoanDialogOpen, setIsLoanDialogOpen] = useState(false);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "digital">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "loan">("cash");
+  const [selectedLoanId, setSelectedLoanId] = useState<string>("");
   const [discountPercent, setDiscountPercent] = useState("0");
   const [amountPaid, setAmountPaid] = useState("");
   const [note, setNote] = useState("");
+  const [receiptContent, setReceiptContent] = useState<string>("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Fetch products
   const { data: products, isLoading: isProductsLoading } = useQuery({
@@ -79,6 +83,13 @@ export default function POS() {
   const { data: customers, isLoading: isCustomersLoading } = useQuery({
     queryKey: ["customers"],
     queryFn: getCustomers,
+  });
+
+  // Fetch customer's active loans when customer is selected
+  const { data: activeLoans = [], isLoading: isLoansLoading } = useQuery({
+    queryKey: ["activeLoans", selectedCustomer?.id],
+    queryFn: () => selectedCustomer ? getCustomerActiveLoans(selectedCustomer.id) : Promise.resolve([]),
+    enabled: !!selectedCustomer && paymentMethod === "loan",
   });
 
   // Calculate cart totals
@@ -176,6 +187,7 @@ export default function POS() {
     setSelectedCustomer(null);
     setDiscountPercent("0");
     setNote("");
+    setSelectedLoanId("");
   };
 
   // Handle checkout
@@ -193,10 +205,28 @@ export default function POS() {
     setIsCheckoutLoading(true);
     
     try {
+      // If payment method is loan but no customer is selected
+      if (paymentMethod === "loan" && !selectedCustomer) {
+        toast.error("Please select a customer for loan payment");
+        setIsCheckoutLoading(false);
+        return;
+      }
+
+      // If payment method is loan, check if loan is selected
+      if (paymentMethod === "loan") {
+        if (!selectedLoanId) {
+          setIsPaymentDialogOpen(false);
+          setIsLoanDialogOpen(true);
+          setIsCheckoutLoading(false);
+          return;
+        }
+      }
+      
       const sale: Omit<Sale, "id" | "createdAt" | "updatedAt"> = {
         invoiceNumber: `INV-${Date.now()}`,
         customerId: selectedCustomer?.id,
         customer: selectedCustomer ?? undefined,
+        loanId: paymentMethod === "loan" ? selectedLoanId : undefined,
         items: cart.map((item) => ({
           id: `item-${Date.now()}-${item.product.id}`,
           saleId: "",
@@ -220,16 +250,21 @@ export default function POS() {
       // For demo, we're mocking the response
       // await createSale(sale);
       
+      // Generate receipt
+      const receiptHtml = generateReceiptHTML(sale);
+      
       // Mock successful sale
       setTimeout(() => {
         toast.success("Sale completed successfully");
         
         // Print receipt
-        generateAndPrintReceipt(sale);
+        setReceiptContent(receiptHtml);
+        setIsPrinting(true);
         
         // Clear cart and reset state
         clearCart();
         setIsPaymentDialogOpen(false);
+        setIsLoanDialogOpen(false);
         setPaymentMethod("cash");
         setAmountPaid("");
         setIsCheckoutLoading(false);
@@ -241,8 +276,18 @@ export default function POS() {
     }
   };
 
-  // Generate and print receipt
-  const generateAndPrintReceipt = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
+  // Handle loan selection
+  const handleLoanConfirm = (loanId: string) => {
+    setSelectedLoanId(loanId);
+    setIsLoanDialogOpen(false);
+    
+    if (loanId) {
+      setIsPaymentDialogOpen(true);
+    }
+  };
+
+  // Generate receipt HTML
+  const generateReceiptHTML = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
     // Format currency
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('en-US', {
@@ -255,7 +300,7 @@ export default function POS() {
     const receiptHTML = `
       <html>
         <head>
-          <title>Sales Receipt</title>
+          <title>${sale.paymentMethod === 'loan' ? 'Loan Bill' : 'Sales Receipt'}</title>
           <style>
             body {
               font-family: 'Courier New', Courier, monospace;
@@ -271,8 +316,19 @@ export default function POS() {
               font-size: 18px;
               font-weight: bold;
             }
+            .bill-type {
+              font-size: 16px;
+              font-weight: bold;
+              color: ${sale.paymentMethod === 'loan' ? 'darkred' : 'black'};
+            }
             .info {
               margin-bottom: 15px;
+              font-size: 12px;
+            }
+            .loan-info {
+              margin: 15px 0;
+              padding: 10px;
+              border: 1px dashed ${sale.paymentMethod === 'loan' ? 'darkred' : 'black'};
               font-size: 12px;
             }
             .divider {
@@ -304,7 +360,7 @@ export default function POS() {
         <body>
           <div class="header">
             <div class="store-name">Merchant POS</div>
-            <div>Sales Receipt</div>
+            <div class="bill-type">${sale.paymentMethod === 'loan' ? 'LOAN BILL' : 'Sales Receipt'}</div>
           </div>
           
           <div class="info">
@@ -314,6 +370,14 @@ export default function POS() {
             <div>Cashier: ${user?.name || 'Unknown'}</div>
             ${sale.customer ? `<div>Customer: ${sale.customer.name}</div>` : ''}
           </div>
+          
+          ${sale.paymentMethod === 'loan' ? `
+          <div class="loan-info">
+            <div><strong>THIS IS A LOAN PURCHASE</strong></div>
+            <div>Loan ID: ${sale.loanId}</div>
+            <div>This purchase has been added to customer's loan account.</div>
+          </div>
+          ` : ''}
           
           <div class="divider"></div>
           
@@ -370,9 +434,16 @@ export default function POS() {
           <div class="divider"></div>
           
           <div>
-            <div>Payment Method: ${paymentMethod === 'cash' ? 'Cash' : paymentMethod === 'card' ? 'Card' : 'Digital Payment'}</div>
+            <div>Payment Method: ${paymentMethod === 'cash' ? 'Cash' : '<strong>LOAN</strong>'}</div>
             ${sale.note ? `<div>Note: ${sale.note}</div>` : ''}
           </div>
+          
+          ${sale.paymentMethod === 'loan' ? `
+          <div class="loan-info" style="text-align: center;">
+            <div>PAYMENT TERMS AS PER LOAN AGREEMENT</div>
+            <div>THIS IS NOT A RECEIPT OF PAYMENT</div>
+          </div>
+          ` : ''}
           
           <div class="footer">
             <p>Thank you for your business!</p>
@@ -381,8 +452,20 @@ export default function POS() {
       </html>
     `;
     
-    // Print the receipt
-    printReceipt(receiptHTML);
+    return receiptHTML;
+  };
+
+  // Handle print success
+  const handlePrintSuccess = () => {
+    setIsPrinting(false);
+    toast.success("Receipt printed successfully");
+  };
+
+  // Handle print error
+  const handlePrintError = (error: any) => {
+    setIsPrinting(false);
+    toast.error("Failed to print receipt");
+    console.error("Print error:", error);
   };
 
   return (
@@ -660,18 +743,14 @@ export default function POS() {
             </div>
             
             <Tabs defaultValue="cash" onValueChange={(value) => setPaymentMethod(value as any)}>
-              <TabsList className="grid grid-cols-3 w-full">
+              <TabsList className="grid grid-cols-2 w-full">
                 <TabsTrigger value="cash" className="flex items-center gap-2">
                   <Banknote size={14} />
                   <span>Cash</span>
                 </TabsTrigger>
-                <TabsTrigger value="card" className="flex items-center gap-2">
-                  <CreditCard size={14} />
-                  <span>Card</span>
-                </TabsTrigger>
-                <TabsTrigger value="digital" className="flex items-center gap-2">
-                  <Wallet size={14} />
-                  <span>Digital</span>
+                <TabsTrigger value="loan" className="flex items-center gap-2" disabled={!selectedCustomer}>
+                  <Receipt size={14} />
+                  <span>Loan</span>
                 </TabsTrigger>
               </TabsList>
               
@@ -699,18 +778,33 @@ export default function POS() {
                 )}
               </TabsContent>
               
-              <TabsContent value="card" className="space-y-3 pt-3">
-                <div className="p-4 text-center space-y-2">
-                  <CreditCard className="mx-auto h-10 w-10 text-muted-foreground" />
-                  <p>Customer will pay by card</p>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="digital" className="space-y-3 pt-3">
-                <div className="p-4 text-center space-y-2">
-                  <Wallet className="mx-auto h-10 w-10 text-muted-foreground" />
-                  <p>Customer will pay using digital wallet</p>
-                </div>
+              <TabsContent value="loan" className="space-y-3 pt-3">
+                {!selectedCustomer ? (
+                  <div className="p-4 text-center space-y-2">
+                    <p>Please select a customer to use loan payment</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md bg-secondary/50 p-3">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Adding to Customer Loan</p>
+                      <p className="text-sm">Customer: {selectedCustomer.name}</p>
+                      {selectedLoanId ? (
+                        <p className="text-sm">Loan ID: {selectedLoanId}</p>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className="w-full mt-2"
+                          onClick={() => {
+                            setIsPaymentDialogOpen(false);
+                            setIsLoanDialogOpen(true);
+                          }}
+                        >
+                          Select Loan
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
@@ -727,7 +821,11 @@ export default function POS() {
             <Button
               className="sm:flex-1"
               onClick={handlePayment}
-              disabled={isCheckoutLoading || (paymentMethod === "cash" && parseFloat(amountPaid || "0") < total)}
+              disabled={
+                isCheckoutLoading || 
+                (paymentMethod === "cash" && parseFloat(amountPaid || "0") < total) ||
+                (paymentMethod === "loan" && !selectedLoanId && selectedCustomer !== null)
+              }
             >
               {isCheckoutLoading ? (
                 <>
@@ -744,7 +842,28 @@ export default function POS() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Loan Selection Dialog */}
+      {selectedCustomer && (
+        <LoanPaymentDialog
+          open={isLoanDialogOpen}
+          onOpenChange={setIsLoanDialogOpen}
+          loans={activeLoans || []}
+          onConfirm={handleLoanConfirm}
+          isLoading={isLoansLoading}
+          title="Select Customer Loan"
+          description="Choose which loan to add this purchase to"
+        />
+      )}
+
+      {/* Print Frame (invisible iframe for printing) */}
+      {isPrinting && (
+        <PrintFrame
+          content={receiptContent}
+          onPrintSuccess={handlePrintSuccess}
+          onPrintError={handlePrintError}
+        />
+      )}
     </div>
   );
 }
-

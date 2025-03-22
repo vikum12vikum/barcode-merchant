@@ -63,7 +63,12 @@ export default function LoanPaymentDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         <div className="grid gap-4 py-4">
-          {activeLoans.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-6 w-6 animate-spin mr-2" />
+              <p>Loading active loans...</p>
+            </div>
+          ) : activeLoans.length === 0 ? (
             <div className="text-center py-4">
               <p className="text-muted-foreground">This customer has no active loans.</p>
               <p className="text-sm mt-2">You need to create a loan for this customer first.</p>

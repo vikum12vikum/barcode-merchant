@@ -22,18 +22,11 @@ import {
   ReceiptText,
   Calendar,
   User,
-  CreditCard,
   Printer,
   Download,
-  ChevronDown,
   Clock,
   Banknote,
-  Wallet,
-  ExternalLink,
-  Filter,
   Loader2,
-  CreditCard as CardIcon,
-  DollarSign,
   Receipt,
 } from "lucide-react";
 import { 
@@ -55,6 +48,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Sale, SaleItem } from "@/lib/types";
 import { toast } from "sonner";
+import PrintFrame from "@/components/PrintFrame";
 
 export default function Sales() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,6 +56,8 @@ export default function Sales() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [receiptContent, setReceiptContent] = useState<string>("");
+  const [isPrinting, setIsPrinting] = useState(false);
 
   // Fetch sales
   const { data: sales, isLoading } = useQuery({
@@ -124,25 +120,9 @@ export default function Sales() {
     // Generate receipt HTML
     const receiptHTML = generateReceiptHTML(sale);
     
-    // Print the receipt
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(receiptHTML);
-      printWindow.document.close();
-      
-      // Wait for content to load before printing
-      printWindow.onload = function() {
-        printWindow.print();
-        // Close window after printing (some browsers might block this)
-        printWindow.onafterprint = function() {
-          printWindow.close();
-        };
-      };
-      
-      toast.success("Invoice sent to printer");
-    } else {
-      toast.error("Unable to open print window. Please check your popup blocker settings.");
-    }
+    // Set receipt content for printing
+    setReceiptContent(receiptHTML);
+    setIsPrinting(true);
   };
 
   // Generate receipt HTML
@@ -151,7 +131,7 @@ export default function Sales() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Invoice #${sale.invoiceNumber}</title>
+          <title>${sale.paymentMethod === 'loan' ? 'Loan Bill' : 'Invoice'} #${sale.invoiceNumber}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -166,6 +146,11 @@ export default function Sales() {
               margin-bottom: 20px;
               border-bottom: 1px solid #ddd;
               padding-bottom: 10px;
+            }
+            .bill-type {
+              font-size: 18px;
+              font-weight: bold;
+              color: ${sale.paymentMethod === 'loan' ? 'darkred' : 'black'};
             }
             .address {
               margin-bottom: 20px;
@@ -205,8 +190,8 @@ export default function Sales() {
             .loan-info {
               margin-top: 15px;
               padding: 10px;
-              border: 1px solid #ddd;
-              background-color: #f9f9f9;
+              border: 1px solid ${sale.paymentMethod === 'loan' ? 'darkred' : '#ddd'};
+              background-color: ${sale.paymentMethod === 'loan' ? '#fee' : '#f9f9f9'};
             }
             .footer {
               text-align: center;
@@ -224,13 +209,13 @@ export default function Sales() {
         </head>
         <body>
           <div class="header">
-            <h2>INVOICE</h2>
+            <h2>${sale.paymentMethod === 'loan' ? 'LOAN BILL' : 'INVOICE'}</h2>
             <h3>#${sale.invoiceNumber}</h3>
           </div>
           
           <div class="invoice-details">
             <strong>Date:</strong> ${formatDate(sale.createdAt)} ${formatTime(sale.createdAt)}<br>
-            <strong>Payment Method:</strong> ${sale.paymentMethod}${sale.paymentMethod === 'loan' ? ' (Credit)' : ''}<br>
+            <strong>Payment Method:</strong> ${sale.paymentMethod === 'loan' ? '<span style="color:darkred;font-weight:bold;">LOAN</span>' : 'Cash'}<br>
             <strong>Status:</strong> ${sale.status}
           </div>
           
@@ -240,6 +225,15 @@ export default function Sales() {
             ${sale.customer?.email ? `<strong>Email:</strong> ${sale.customer.email}<br>` : ''}
             ${sale.customer?.address ? `<strong>Address:</strong> ${sale.customer.address}<br>` : ''}
           </div>
+          
+          ${sale.paymentMethod === 'loan' ? `
+          <div class="loan-info">
+            <strong>THIS IS A LOAN PURCHASE</strong><br>
+            <strong>Loan ID:</strong> ${sale.loanId}<br>
+            <strong>Payment Terms:</strong> As per loan agreement<br>
+            <strong>Note:</strong> This purchase has been added to customer's loan account.
+          </div>
+          ` : ''}
           
           <table>
             <thead>
@@ -287,11 +281,10 @@ export default function Sales() {
             </table>
           </div>
           
-          ${sale.loanId ? `
-            <div class="loan-info">
-              <strong>Added to Loan:</strong> This purchase has been added to customer's loan account.<br>
-              <strong>Loan ID:</strong> ${sale.loanId}<br>
-              <strong>Payment Terms:</strong> As per loan agreement
+          ${sale.paymentMethod === 'loan' ? `
+            <div class="loan-info" style="text-align:center;margin-top:20px;padding:15px;">
+              <strong>PAYMENT TERMS AS PER LOAN AGREEMENT</strong><br>
+              <strong>THIS IS NOT A RECEIPT OF PAYMENT</strong>
             </div>
           ` : ''}
           
@@ -317,19 +310,28 @@ export default function Sales() {
     }, 1500);
   };
 
+  // Handle print success
+  const handlePrintSuccess = () => {
+    setIsPrinting(false);
+    toast.success("Invoice sent to printer");
+  };
+
+  // Handle print error
+  const handlePrintError = (error: any) => {
+    setIsPrinting(false);
+    toast.error("Unable to print. Please try again.");
+    console.error("Print error:", error);
+  };
+
   // Get payment method icon
   const getPaymentIcon = (method: string) => {
     switch (method) {
       case "cash":
         return <Banknote size={14} />;
-      case "card":
-        return <CardIcon size={14} />;
-      case "digital":
-        return <Wallet size={14} />;
       case "loan":
         return <Receipt size={14} />;
       default:
-        return <CardIcon size={14} />;
+        return <Banknote size={14} />;
     }
   };
 
@@ -383,7 +385,6 @@ export default function Sales() {
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-full sm:w-32">
               <div className="flex items-center gap-2">
-                <Filter size={14} />
                 <SelectValue placeholder="Status" />
               </div>
             </SelectTrigger>
@@ -398,15 +399,12 @@ export default function Sales() {
           <Select value={paymentFilter} onValueChange={setPaymentFilter}>
             <SelectTrigger className="w-full sm:w-32">
               <div className="flex items-center gap-2">
-                <CreditCard size={14} />
                 <SelectValue placeholder="Payment" />
               </div>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Methods</SelectItem>
               <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="card">Card</SelectItem>
-              <SelectItem value="digital">Digital</SelectItem>
               <SelectItem value="loan">Loan</SelectItem>
             </SelectContent>
           </Select>
@@ -487,7 +485,7 @@ export default function Sales() {
                           className="h-8 w-8"
                           onClick={() => viewInvoice(sale)}
                         >
-                          <ExternalLink size={14} />
+                          <ReceiptText size={14} />
                         </Button>
                         <Button
                           variant="ghost"
@@ -521,7 +519,9 @@ export default function Sales() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ReceiptText size={18} />
-              <span>Invoice #{selectedSale?.invoiceNumber}</span>
+              <span>
+                {selectedSale?.paymentMethod === 'loan' ? 'Loan Bill' : 'Invoice'} #{selectedSale?.invoiceNumber}
+              </span>
             </DialogTitle>
           </DialogHeader>
           
@@ -564,12 +564,23 @@ export default function Sales() {
                     </span>
                     <span className="block">
                       <span className="text-muted-foreground">Payment Method: </span>
-                      {selectedSale.paymentMethod}
-                      {selectedSale.loanId && <span className="text-blue-500 ml-1">(Loan)</span>}
+                      {selectedSale.paymentMethod === 'loan' ? (
+                        <span className="text-red-500 font-semibold">LOAN</span>
+                      ) : (
+                        'Cash'
+                      )}
                     </span>
                   </p>
                 </div>
               </div>
+              
+              {selectedSale.loanId && (
+                <div className="bg-red-50 border border-red-200 p-3 rounded-md text-sm">
+                  <span className="font-medium text-red-700">Loan Purchase: </span>
+                  This purchase has been added to customer's loan (ID: {selectedSale.loanId}).
+                  Payment terms as per loan agreement.
+                </div>
+              )}
               
               <div className="border rounded-md">
                 <Table>
@@ -624,13 +635,6 @@ export default function Sales() {
                 </div>
               </div>
               
-              {selectedSale.loanId && (
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded-md text-sm">
-                  <span className="font-medium text-blue-700">Loan Information: </span>
-                  This purchase has been added to customer's loan (ID: {selectedSale.loanId})
-                </div>
-              )}
-              
               {selectedSale.note && (
                 <div className="bg-muted/50 p-3 rounded-md text-sm">
                   <span className="font-medium">Note: </span>
@@ -664,6 +668,15 @@ export default function Sales() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Print Frame */}
+      {isPrinting && (
+        <PrintFrame
+          content={receiptContent}
+          onPrintSuccess={handlePrintSuccess}
+          onPrintError={handlePrintError}
+        />
+      )}
     </div>
   );
 }
