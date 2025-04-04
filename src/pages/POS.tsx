@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getProducts, getCustomers, createSale, printReceipt } from "@/lib/api";
-import { Product, Customer, Sale } from "@/lib/types";
+import { Product, Customer, Sale, SaleItem } from "@/lib/types";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { ProductCard } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { useAuth } from "@/context/AuthContext";
+import PrintFrame from "@/components/PrintFrame";
 
 interface CartItem {
   product: Product;
@@ -68,6 +70,7 @@ export default function POS() {
   const [discountPercent, setDiscountPercent] = useState("0");
   const [amountPaid, setAmountPaid] = useState("");
   const [note, setNote] = useState("");
+  const [receiptContent, setReceiptContent] = useState<string | null>(null);
 
   // Fetch products
   const { data: products, isLoading: isProductsLoading } = useQuery({
@@ -193,20 +196,21 @@ export default function POS() {
     setIsCheckoutLoading(true);
     
     try {
+      // Convert cart items to SaleItems, now with id field set to undefined initially
+      const saleItems: SaleItem[] = cart.map((item) => ({
+        productId: item.product.id,
+        product: item.product,
+        quantity: item.quantity,
+        price: item.product.price,
+        discount: 0,
+        total: item.product.price * item.quantity,
+      }));
+
       const sale: Omit<Sale, "id" | "createdAt" | "updatedAt"> = {
         invoiceNumber: `INV-${Date.now()}`,
         customerId: selectedCustomer?.id,
         customer: selectedCustomer ?? undefined,
-        items: cart.map((item) => ({
-          id: `item-${Date.now()}-${item.product.id}`,
-          saleId: "",
-          productId: item.product.id,
-          product: item.product,
-          quantity: item.quantity,
-          price: item.product.price,
-          discount: 0,
-          total: item.product.price * item.quantity,
-        })),
+        items: saleItems,
         subtotal,
         discount: discountAmount,
         tax: 0,
@@ -216,24 +220,21 @@ export default function POS() {
         note: note || undefined,
       };
       
-      // In a real app, this would be an API call to create a sale
-      // For demo, we're mocking the response
-      // await createSale(sale);
+      // Call the API to create a sale
+      const result = await createSale(sale);
       
-      // Mock successful sale
-      setTimeout(() => {
-        toast.success("Sale completed successfully");
-        
-        // Print receipt
-        generateAndPrintReceipt(sale);
-        
-        // Clear cart and reset state
-        clearCart();
-        setIsPaymentDialogOpen(false);
-        setPaymentMethod("cash");
-        setAmountPaid("");
-        setIsCheckoutLoading(false);
-      }, 1000);
+      toast.success("Sale completed successfully");
+      
+      // Generate and print receipt
+      const receiptHtml = generateReceiptHtml(sale);
+      setReceiptContent(receiptHtml);
+      
+      // Clear cart and reset state
+      clearCart();
+      setIsPaymentDialogOpen(false);
+      setPaymentMethod("cash");
+      setAmountPaid("");
+      setIsCheckoutLoading(false);
     } catch (error) {
       console.error("Failed to complete sale:", error);
       toast.error("Failed to complete sale");
@@ -241,8 +242,8 @@ export default function POS() {
     }
   };
 
-  // Generate and print receipt
-  const generateAndPrintReceipt = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
+  // Generate receipt HTML
+  const generateReceiptHtml = (sale: Omit<Sale, "id" | "createdAt" | "updatedAt">) => {
     // Format currency
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('en-US', {
@@ -252,7 +253,7 @@ export default function POS() {
     };
     
     // Create receipt content
-    const receiptHTML = `
+    return `
       <html>
         <head>
           <title>Sales Receipt</title>
@@ -380,9 +381,18 @@ export default function POS() {
         </body>
       </html>
     `;
-    
-    // Print the receipt
-    printReceipt(receiptHTML);
+  };
+
+  // Handle print completion
+  const handlePrintSuccess = () => {
+    setReceiptContent(null);
+  };
+
+  // Handle print error
+  const handlePrintError = (error: any) => {
+    console.error("Print error:", error);
+    toast.error("Failed to print receipt");
+    setReceiptContent(null);
   };
 
   return (
@@ -744,7 +754,15 @@ export default function POS() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Print Receipt Frame */}
+      {receiptContent && (
+        <PrintFrame
+          content={receiptContent}
+          onPrintSuccess={handlePrintSuccess}
+          onPrintError={handlePrintError}
+        />
+      )}
     </div>
   );
 }
-

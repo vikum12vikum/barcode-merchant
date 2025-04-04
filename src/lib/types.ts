@@ -19,6 +19,13 @@ export interface Product {
   updatedAt: string;
 }
 
+export interface Category {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -30,8 +37,8 @@ export interface Customer {
 }
 
 export interface SaleItem {
-  id: string;
-  saleId: string;
+  id?: string;
+  saleId?: string;
   productId: string;
   product: Product;
   quantity: number;
@@ -147,3 +154,28 @@ export interface ReportFilters {
   productId?: string;
   customerId?: string;
 }
+
+// API Response types based on documentation
+export interface ApiResponse<T> {
+  code?: number;
+  status?: number;
+  data: T;
+}
+
+export interface LoginResponse {
+  token: string;
+  id: number;
+  role_id: number;
+  name: string;
+}
+
+export interface OrderItem {
+  product_id: string;
+  quantity: number;
+}
+
+export interface OrderRequest {
+  user_id: string;
+  orders: OrderItem[];
+}
+
